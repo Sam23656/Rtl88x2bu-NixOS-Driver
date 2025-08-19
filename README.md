@@ -21,7 +21,8 @@
 - [📦 Features](#-features)
 - [💻 Supported Devices](#-supported-devices)
 - [⚙️ Usage Instructions](#️-usage-instructions)
-  - [Using in NixOS Configuration](#using-in-nixos-configuration)
+- [1 Method. Using in NixOS Configuration](#1-method-using-in-nixos-configuration)
+- [2 Method. Using Nix flakes](#2-method-using-nix-flakes)
 - [✔️ Verification](#️-verification)
 - [⚡ USB 3.0 Support](#-usb-30-support)
 - [⚖️ License](#️-license)
@@ -107,51 +108,103 @@
 
 ## ⚙️ Usage Instructions
 
-### Using in NixOS Configuration
+## 1 Method. Using in NixOS Configuration
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/Sam23656/Rtl88x2bu-NixOS-Driver
-   ```
+**1. Clone the repository:**
+```bash
+git clone https://github.com/Sam23656/Rtl88x2bu-NixOS-Driver
+```
 
-2. **Go into the repository directory**:
-   ```bash
-   cd Rtl88x2bu-NixOS-Driver
-   ```
+**2. Go into the repository directory:**
+```bash
+cd Rtl88x2bu-NixOS-Driver
+```
 
-3. **Copy the `rtl88x2bu.nix` file** to your NixOS configuration directory:
-   ```bash
-   cp rtl88x2bu.nix /etc/nixos/
-   ```
+**3. Copy the `rtl88x2bu.nix` file to your NixOS configuration directory:**
+```bash
+cp rtl88x2bu.nix /etc/nixos/
+```
 
-4. **Add the following code to `/etc/nixos/configuration.nix`:**
-   ```nix
-   { config, pkgs, ... }:
-   let
-     rtl88x2bu = pkgs.callPackage ./rtl88x2bu.nix {
-       kernel = config.boot.kernelPackages.kernel;
-     };
-   in
-   {
-     imports = [
-       ./hardware-configuration.nix
-     ];
+**4. Add the following code to `/etc/nixos/configuration.nix`:**
+```nix
+{ config, pkgs, ... }:
+let
+  rtl88x2bu = pkgs.callPackage ./rtl88x2bu.nix {
+  kernel = config.boot.kernelPackages.kernel;
+};
+in
+{
+  imports = [
+    ./hardware-configuration.nix
+  ];
+  boot.extraModulePackages = [ rtl88x2bu ];
+  boot.kernelModules = [ "88x2bu" ];
+  boot.blacklistedKernelModules = [
+    "rtw88_core" "rtw88_usb" "rtw88_8822bu" "rtw88_8822b" "rtw88"
+  ];
+  hardware.enableRedistributableFirmware = true;
+    # ... other nixos configuration
+}
+```
 
-     boot.extraModulePackages = [ rtl88x2bu ];
-     boot.kernelModules = [ "88x2bu" ];
-     boot.blacklistedKernelModules = [
-       "rtw88_core" "rtw88_usb" "rtw88_8822bu" "rtw88_8822b" "rtw88"
-     ];
-     hardware.enableRedistributableFirmware = true;
+**5. Rebuild your system:**
+```bash
+sudo nixos-rebuild switch
+```
 
-     # ... other nixos configuration
-   }
-   ```
+## 2 Method. Using Nix flakes
 
-5. **Rebuild your system:**
-   ```bash
-   sudo nixos-rebuild switch
-   ```
+**Step 1: Enable flakes in your NixOS configuration**
+
+Add to your `/etc/nixos/configuration.nix`:
+```nix
+nix.settings.experimental-features = [ "nix-command" "flakes" ];
+```
+
+**Step 2: Add the driver repository to your flake**
+
+In your `flake.nix`, add the repository to inputs:
+```nix
+inputs = {
+  rtl88x2bu = {
+    url = "github:Sam23656/Rtl88x2bu-NixOS-Driver";
+    flake = false;
+  };
+};
+```
+
+Then in your outputs add:
+```nix
+outputs = { self, nixpkgs, rtl88x2bu, ... } @ inputs:
+# ... other flake configuration
+```
+
+**Step 3: Use the driver in your configuration**
+
+Add to your NixOS modules:
+```nix
+{ config, pkgs, inputs, ... }:
+let
+  rtl88x2bu = pkgs.callPackage "${inputs.rtl88x2bu}/rtl88x2bu.nix" {
+  kernel = config.boot.kernelPackages.kernel;
+};
+in
+{
+  boot = {
+  extraModulePackages = [ rtl88x2bu ];
+  kernelModules = [ "88x2bu" ];
+  blacklistedKernelModules = [
+    "rtw88_core" "rtw88_usb" "rtw88_8822bu" "rtw_8822b" "rtw88"
+  ];
+  hardware.enableRedistributableFirmware = true;
+  };
+};
+```
+
+**Step 4: Rebuild your system**
+```bash
+sudo nixos-rebuild switch --flake .
+```
 
 ---
 
